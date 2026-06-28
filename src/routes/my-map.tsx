@@ -9,6 +9,7 @@ import { CustomARArrow } from '@/components/CustomARArrow'
 import {
   type CustomMap, type CMNode, bearingDegCM, calibrationForNode, decodeNodeQR,
   distCM, findPathCM, floorsInMap, loadCustomMap, nearestNodeIdCM, clearCustomMap,
+  snapToNearestEdgeCM,
 } from '@/lib/customMap'
 
 export const Route = createFileRoute('/my-map')({
@@ -31,6 +32,7 @@ function MyMapPage() {
   const setSurveyMode = useNav((s) => s.setSurveyMode)
   const calibrate = useNav((s) => s.calibrate)
   const setFloor = useNav((s) => s.setFloor)
+  const setSnapFn = useNav((s) => s.setSnapFn)
 
   const [map, setMap] = useState<CustomMap | null>(null)
   const [destId, setDestId] = useState<string | null>(null)
@@ -64,6 +66,14 @@ function MyMapPage() {
   useEffect(() => { setSurveyMode(true); return () => setSurveyMode(false) }, [setSurveyMode])
   useEffect(() => { if (pos && floor !== previewFloor) setPreviewFloor(floor) }, [floor]) // eslint-disable-line
   useEffect(() => { if (status === 'idle') { requestPermission().catch(() => {}) } }, [status, requestPermission])
+
+  // Phase 1 — snap PDR position to nearest walkable edge
+  useEffect(() => {
+    if (map) {
+      setSnapFn((p) => snapToNearestEdgeCM(map, p, floor) ?? p)
+      return () => setSnapFn(null)
+    }
+  }, [map, floor, setSnapFn])
 
   const rooms = useMemo(() => (map?.nodes ?? []).filter((n) => n.kind === 'room'), [map])
   const floors = useMemo(() => map ? floorsInMap(map) : [], [map])

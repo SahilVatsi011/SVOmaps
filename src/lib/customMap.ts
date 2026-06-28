@@ -118,6 +118,32 @@ export function findPathCM(map: CustomMap, startId: string, goalId: string): CMN
   return []
 }
 
+/** Snap a position to the nearest walkable edge on the same floor.
+ *  Returns null if no edge exists on that floor. */
+export function snapToNearestEdgeCM(map: CustomMap, pos: CMPoint, floor: CMFloor, maxDistM = 2): CMPoint | null {
+  let best: CMPoint | null = null
+  let bestD = Infinity
+  const byId: Record<string, CMNode> = Object.fromEntries(map.nodes.map((n) => [n.id, n]))
+  for (const e of map.edges) {
+    const a = byId[e.a]
+    const b = byId[e.b]
+    if (!a || !b) continue
+    if (a.floor !== floor || b.floor !== floor) continue
+    const abx = b.pos.x - a.pos.x
+    const aby = b.pos.y - a.pos.y
+    const denom = abx * abx + aby * aby
+    if (denom === 0) continue
+    let t = ((pos.x - a.pos.x) * abx + (pos.y - a.pos.y) * aby) / denom
+    t = Math.max(0, Math.min(1, t))
+    const px = a.pos.x + t * abx
+    const py = a.pos.y + t * aby
+    const d = distCM(pos, { x: px, y: py })
+    if (d < bestD) { bestD = d; best = { x: px, y: py } }
+  }
+  if (best && bestD > maxDistM) return null
+  return best
+}
+
 export function nearestNodeIdCM(map: CustomMap, pos: CMPoint, floor: CMFloor): string | null {
   let best: string | null = null
   let bestD = Infinity

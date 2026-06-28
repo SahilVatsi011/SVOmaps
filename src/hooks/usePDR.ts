@@ -21,6 +21,8 @@ export function usePDR() {
   const vertHistory = useRef<number[]>([])
   // Low-pass of gravity vector (used to extract user vertical accel).
   const gravity = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 9.8 })
+  // Step length estimation: accel magnitudes around each step peak
+  const magWindow = useRef<number[]>([])
 
   const registerStep = useNav((s) => s.registerStep)
   const updateRawCompass = useNav((s) => s.updateRawCompass)
@@ -97,9 +99,24 @@ export function usePDR() {
         // Heuristic: stair steps have stronger sustained vertical motion + slower cadence.
         const isStair = vRMS > 1.6 && cadence > 480 && cadence < 1400
         setStairMode(isStair)
+
+        // Phase 2 — step length estimation
+        const stepMagWindow = magWindow.current.slice(-8)
+        let stepLenOverride: number | undefined
+        if (stepMagWindow.length >= 3) {
+          const peak = Math.max(...stepMagWindow)
+          const valley = Math.min(...stepMagWindow)
+          const estLen = 0.45 * Math.pow(peak - valley, 0.25)
+          stepLenOverride = Math.max(0.3, Math.min(1.2, estLen))
+        }
+
         setStepCount((c) => c + 1)
-        registerStep(isStair)
+        registerStep(isStair, stepLenOverride)
       }
+      // Keep a rolling window of mag for step length estimation
+      const mw = magWindow.current
+      mw.push(mag)
+      if (mw.length > 20) mw.shift()
     }
 
     function onOrientation(e: DeviceOrientationEvent) {

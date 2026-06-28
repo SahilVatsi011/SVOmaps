@@ -30,7 +30,9 @@ interface NavState {
   calibrate: (rawCompass: number, opts?: { pos?: Point; floor?: FloorId; headingDeg?: number }) => void
   setPose: (pos: Point, floor: FloorId) => void
   updateRawCompass: (rawCompass: number) => void
-  registerStep: (isStair?: boolean) => void
+  snapFn: ((pos: Point) => Point) | null
+  setSnapFn: (fn: ((pos: Point) => Point) | null) => void
+  registerStep: (isStair?: boolean, stepLengthOverride?: number) => void
   reset: () => void
 }
 
@@ -45,8 +47,10 @@ export const useNav = create<NavState>((set, get) => ({
   stairStepCount: 0,
   onStairs: false,
   surveyMode: false,
+  snapFn: null,
 
   setStepLength: (m) => set({ stepLengthM: m }),
+  setSnapFn: (fn) => set({ snapFn: fn }),
   setDestination: (id) => set({ destinationId: id }),
   setSurveyMode: (on) => set({ surveyMode: on }),
 
@@ -99,9 +103,10 @@ export const useNav = create<NavState>((set, get) => ({
     set({ heading: h })
   },
 
-  registerStep: (isStair = false) => {
-    const { pos, heading, stepLengthM, floor, stairStepCount, surveyMode } = get()
+  registerStep: (isStair = false, stepLengthOverride?: number) => {
+    const { pos, heading, stepLengthM, floor, stairStepCount, surveyMode, snapFn } = get()
     if (!pos) return
+    const stepLen = stepLengthOverride ?? stepLengthM
 
     if (isStair) {
       if (surveyMode) {
@@ -137,10 +142,12 @@ export const useNav = create<NavState>((set, get) => ({
 
     // Normal horizontal step.
     const rad = (heading * Math.PI) / 180
-    const dx = Math.sin(rad) * stepLengthM
-    const dy = -Math.cos(rad) * stepLengthM
+    const dx = Math.sin(rad) * stepLen
+    const dy = -Math.cos(rad) * stepLen
+    let newPos = { x: pos.x + dx, y: pos.y + dy }
+    if (snapFn) newPos = snapFn(newPos)
     set({
-      pos: { x: pos.x + dx, y: pos.y + dy },
+      pos: newPos,
       onStairs: false,
       stairStepCount: 0,
     })
