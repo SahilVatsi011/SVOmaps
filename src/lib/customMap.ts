@@ -73,6 +73,101 @@ export function bearingDegCM(from: CMPoint, to: CMPoint) {
   return deg
 }
 
+/** Subdivide a line segment into points at most `maxStepM` apart. */
+export function subdivideEdge(a: CMPoint, b: CMPoint, maxStepM = 2): CMPoint[] {
+  const d = distCM(a, b)
+  const count = Math.max(1, Math.round(d / maxStepM))
+  const pts: CMPoint[] = []
+  for (let i = 0; i <= count; i++) {
+    const t = i / count
+    pts.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
+  }
+  return pts
+}
+
+/** Build a dense waypoint graph from existing edges + corridor traces.
+ *  Every edge longer than `maxStepM` gets subdivided with intermediate waypoints.
+ *  Corridor traces (polylines per floor) are also subdivided and added. */
+export function buildDenseGraph(
+  existingNodes: CMNode[],
+  existingEdges: CMEdge[],
+  corridorTracesPerFloor: Record<number, CMPoint[][]>,
+  maxStepM = 2,
+): { nodes: CMNode[]; edges: CMEdge[] } {
+  const nodes = [...existingNodes]
+  const edges = [...existingEdges]
+  const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
+  let nextId = nodes.length + 1
+
+  function wp(pt: CMPoint, floor: number): string {
+    const id = `_dense_${nextId++}`
+    nodes.push({ id, pos: { ...pt }, floor, kind: 'waypoint' })
+    return id
+  }
+
+  const extra: CMEdge[] = []
+  for (const e of edges) {
+    const a = byId[e.a]
+    const b = byId[e.b]
+    if (!a || !b) continue
+    if (a.floor !== b.floor) continue
+    if (e.stairs) continue
+    const subPts = subdivideEdge(a.pos, b.pos, maxStepM)
+    let prev = e.a
+    for (let i = 1; i < subPts.length - 1; i++) {
+      const id = wp(subPts[i], a.floor)
+      extra.push({ a: prev, b: id })
+      prev = id
+    }
+    extra.push({ a: prev, b: e.b })
+  }
+
+  for (const [floorStr, traces] of Object.entries(corridorTracesPerFloor)) {
+    const floor = Number(floorStr)
+    for (const poly of traces) {
+      if (poly.length < 2) continue
+      let prev = wp(poly[0], floor)
+      for (let i = 1; i < poly.length; i++) {
+        const subPts = subdivideEdge(poly[i - 1], poly[i], maxStepM)
+        for (let j = 1; j < subPts.length; j++) {
+          const id = wp(subPts[j], floor)
+          extra.push({ a: prev, b: id })
+          prev = id
+        }
+      }
+    }
+  }
+
+  return { nodes, edges: [...edges, ...extra] }
+}
+
+/** Return the bearing of the nearest same-floor edge, or null if none found. */
+export function nearestEdgeDirection(
+  map: CustomMap, pos: CMPoint, floor: CMFloor, maxDistM = 2,
+): number | null {
+  let bestEdge: { a: CMPoint; b: CMPoint } | null = null
+  let bestD = Infinity
+  const byId = Object.fromEntries(map.nodes.map((n) => [n.id, n]))
+  for (const e of map.edges) {
+    const a = byId[e.a]
+    const b = byId[e.b]
+    if (!a || !b) continue
+    if (a.floor !== floor || b.floor !== floor) continue
+    const abx = b.pos.x - a.pos.x
+    const aby = b.pos.y - a.pos.y
+    const denom = abx * abx + aby * aby
+    if (denom === 0) continue
+    let t = ((pos.x - a.pos.x) * abx + (pos.y - a.pos.y) * aby) / denom
+    t = Math.max(0, Math.min(1, t))
+    const px = a.pos.x + t * abx
+    const py = a.pos.y + t * aby
+    const d = distCM(pos, { x: px, y: py })
+    if (d < bestD) { bestD = d; bestEdge = { a: a.pos, b: b.pos } }
+  }
+  if (!bestEdge || bestD > maxDistM) return null
+  return bearingDegCM(bestEdge.a, bestEdge.b)
+}
+
 // A* over a custom map.
 export function findPathCM(map: CustomMap, startId: string, goalId: string): CMNode[] {
   const byId: Record<string, CMNode> = Object.fromEntries(map.nodes.map((n) => [n.id, n]))

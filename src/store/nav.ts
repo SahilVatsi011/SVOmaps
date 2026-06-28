@@ -32,6 +32,8 @@ interface NavState {
   updateRawCompass: (rawCompass: number) => void
   snapFn: ((pos: Point) => Point) | null
   setSnapFn: (fn: ((pos: Point) => Point) | null) => void
+  headingCorrectionFn: ((pos: Point, heading: number, floor: number) => number | null) | null
+  setHeadingCorrectionFn: (fn: ((pos: Point, heading: number, floor: number) => number | null) | null) => void
   registerStep: (isStair?: boolean, stepLengthOverride?: number) => void
   reset: () => void
 }
@@ -48,9 +50,11 @@ export const useNav = create<NavState>((set, get) => ({
   onStairs: false,
   surveyMode: false,
   snapFn: null,
+  headingCorrectionFn: null,
 
   setStepLength: (m) => set({ stepLengthM: m }),
   setSnapFn: (fn) => set({ snapFn: fn }),
+  setHeadingCorrectionFn: (fn) => set({ headingCorrectionFn: fn }),
   setDestination: (id) => set({ destinationId: id }),
   setSurveyMode: (on) => set({ surveyMode: on }),
 
@@ -104,13 +108,12 @@ export const useNav = create<NavState>((set, get) => ({
   },
 
   registerStep: (isStair = false, stepLengthOverride?: number) => {
-    const { pos, heading, stepLengthM, floor, stairStepCount, surveyMode, snapFn } = get()
+    const { pos, heading, stepLengthM, floor, stairStepCount, surveyMode, snapFn, headingCorrectionFn } = get()
     if (!pos) return
     const stepLen = stepLengthOverride ?? stepLengthM
 
     if (isStair) {
       if (surveyMode) {
-        // Free-roam survey: any stair-detected steps count; auto-flip floor at threshold.
         const next = stairStepCount + 1
         if (next >= STAIR_STEPS_PER_FLIGHT) {
           const newFloor: FloorId = floor === 1 ? 2 : 1
@@ -120,7 +123,6 @@ export const useNav = create<NavState>((set, get) => ({
         }
         return
       }
-      // Demo mode: only count near a known stair landing on this floor.
       const stair = NODE_BY_ID[STAIR_NODE_BY_FLOOR[floor]]
       if (dist(pos, stair.pos) <= STAIR_NODE_RADIUS_M) {
         const next = stairStepCount + 1
@@ -140,14 +142,27 @@ export const useNav = create<NavState>((set, get) => ({
       }
     }
 
-    // Normal horizontal step.
-    const rad = (heading * Math.PI) / 180
+    // Compute effective heading: blend compass toward corridor direction if applicable
+    let effectiveHeading = heading
+    if (headingCorrectionFn) {
+      const corridorHeading = headingCorrectionFn(pos, heading, floor)
+      if (corridorHeading != null) {
+        const diff = ((corridorHeading - heading) % 360 + 360) % 360
+        if (diff < 45 || diff > 315) {
+          effectiveHeading = ((heading * 0.85 + corridorHeading * 0.15) % 360 + 360) % 360
+        }
+      }
+    }
+
+    // Normal horizontal step using optionally corrected heading
+    const rad = (effectiveHeading * Math.PI) / 180
     const dx = Math.sin(rad) * stepLen
     const dy = -Math.cos(rad) * stepLen
     let newPos = { x: pos.x + dx, y: pos.y + dy }
     if (snapFn) newPos = snapFn(newPos)
     set({
       pos: newPos,
+      heading: effectiveHeading,
       onStairs: false,
       stairStepCount: 0,
     })

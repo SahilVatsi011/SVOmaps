@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" width="640" height="480">
+  <defs>
+    <style>
+      text { font-family: Arial, sans-serif; font-size: 10px; fill: #1a1a1a; text-anchor: middle; dominant-baseline: central; }
+      .title { font-size: 12px; font-weight: bold; }
+      .room { fill: #f8f9fa; stroke: #333; stroke-width: 1.5; }
+      .corridor { fill: #e9ecef; stroke: #666; stroke-width: 1; }
+      .label { font-size: 9px; fill: #333; }
+      .dim { font-size: 8px; fill: #888; }
+    </style>
+  </defs>
+
+  <!-- Building outer wall -->
+  <rect x="10" y="10" width="300" height="220" fill="none" stroke="#222" stroke-width="2.5" rx="2"/>
+
+  <!-- Corridor -->
+  <rect x="10" y="95" width="300" height="40" class="corridor" />
+
+  <!-- South rooms (y=145 to y=200, 55px tall) -->
+  <rect x="30" y="150" width="50" height="60" class="room" rx="2" />
+  <rect x="90" y="150" width="50" height="60" class="room" rx="2" />
+  <rect x="150" y="150" width="50" height="60" class="room" rx="2" />
+  <rect x="220" y="150" width="70" height="60" class="room" rx="2" />
+
+  <!-- North rooms (y=20 to y=75, 55px tall) -->
+  <rect x="30" y="25" width="50" height="60" class="room" rx="2" />
+  <rect x="90" y="25" width="50" height="60" class="room" rx="2" />
+  <rect x="150" y="25" width="50" height="60" class="room" rx="2" />
+
+  <!-- Door openings (gaps in corridor wall) -->
+  <!-- Room 101 door -->
+  <rect x="45" y="135" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 102 door -->
+  <rect x="105" y="135" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 103 door -->
+  <rect x="165" y="135" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 104 door -->
+  <rect x="245" y="135" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 105 door -->
+  <rect x="45" y="87" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 106 door -->
+  <rect x="105" y="87" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+  <!-- Room 107 door -->
+  <rect x="165" y="87" width="20" height="8" fill="#e9ecef" stroke="#666" stroke-width="0.5" />
+
+  <!-- Room labels -->
+  <text x="55" y="180" class="label">Reception</text>
+  <text x="115" y="180" class="label">Exam 1</text>
+  <text x="175" y="180" class="label">Exam 2</text>
+  <text x="255" y="180" class="label">X-Ray</text>
+
+  <text x="55" y="55" class="label">Pharmacy</text>
+  <text x="115" y="55" class="label">Lab</text>
+  <text x="175" y="55" class="label">Office</text>
+
+  <!-- Floor numbers -->
+  <text x="55" y="130" class="label">101</text>
+  <text x="115" y="130" class="label">102</text>
+  <text x="175" y="130" class="label">103</text>
+  <text x="255" y="130" class="label">104</text>
+  <text x="55" y="80" class="label">105</text>
+  <text x="115" y="80" class="label">106</text>
+  <text x="175" y="80" class="label">107</text>
+
+  <!-- Entrance -->
+  <rect x="10" y="105" width="16" height="20" fill="#d4edda" stroke="#28a745" stroke-width="2" rx="10 0 0 10" />
+  <polygon points="20,110 32,115 20,120" fill="#28a745" />
+  <text x="26" y="108" font-size="6" fill="#fff" font-weight="bold">→</text>
+  <text x="10" y="140" font-size="7" fill="#28a745">ENTRANCE</text>
+
+  <!-- Stairs -->
+  <rect x="289" y="105" width="16" height="20" fill="#fff3cd" stroke="#ffc107" stroke-width="2" rx="0 10 10 0" />
+  <text x="297" y="117" font-size="9" fill="#856404" font-weight="bold">↕</text>
+  <text x="297" y="140" font-size="7" fill="#856404">STAIRS</text>
+
+  <!-- Scale bar -->
+  <line x1="10" y1="225" x2="310" y2="225" stroke="#999" stroke-width="1" />
+  <line x1="10" y1="222" x2="10" y2="228" stroke="#999" stroke-width="1" />
+  <line x1="310" y1="222" x2="310" y2="228" stroke="#999" stroke-width="1" />
+  <text x="160" y="218" class="dim">Corridor: 30 meters</text>
+</svg>

@@ -1,0 +1,70 @@
+{
+  "name": "Demo Hospital",
+  "createdAt": 1719600000000,
+  "nodes": [
+    { "id": "entrance", "pos": { "x": 0, "y": 10 }, "floor": 1, "kind": "waypoint", "name": "Main Entrance" },
+    { "id": "corr_5m_1", "pos": { "x": 5, "y": 10 }, "floor": 1, "kind": "waypoint" },
+    { "id": "corr_10m_1", "pos": { "x": 10, "y": 10 }, "floor": 1, "kind": "waypoint" },
+    { "id": "corr_15m_1", "pos": { "x": 15, "y": 10 }, "floor": 1, "kind": "waypoint" },
+    { "id": "corr_20m_1", "pos": { "x": 20, "y": 10 }, "floor": 1, "kind": "waypoint" },
+    { "id": "corr_25m_1", "pos": { "x": 25, "y": 10 }, "floor": 1, "kind": "waypoint" },
+    { "id": "stair_1", "pos": { "x": 30, "y": 10 }, "floor": 1, "kind": "stair", "stairPairId": "stair_2" },
+
+    { "id": "room_101", "pos": { "x": 5, "y": 16 }, "floor": 1, "kind": "room", "name": "Reception" },
+    { "id": "room_102", "pos": { "x": 12, "y": 16 }, "floor": 1, "kind": "room", "name": "Exam 1" },
+    { "id": "room_103", "pos": { "x": 19, "y": 16 }, "floor": 1, "kind": "room", "name": "Exam 2" },
+    { "id": "room_104", "pos": { "x": 27, "y": 16 }, "floor": 1, "kind": "room", "name": "X-Ray" },
+    { "id": "room_105", "pos": { "x": 5, "y": 4 }, "floor": 1, "kind": "room", "name": "Pharmacy" },
+    { "id": "room_106", "pos": { "x": 12, "y": 4 }, "floor": 1, "kind": "room", "name": "Lab" },
+    { "id": "room_107", "pos": { "x": 19, "y": 4 }, "floor": 1, "kind": "room", "name": "Office" },
+
+    { "id": "corr_5m_2", "pos": { "x": 5, "y": 10 }, "floor": 2, "kind": "waypoint" },
+    { "id": "corr_10m_2", "pos": { "x": 10, "y": 10 }, "floor": 2, "kind": "waypoint" },
+    { "id": "corr_15m_2", "pos": { "x": 15, "y": 10 }, "floor": 2, "kind": "waypoint" },
+    { "id": "corr_20m_2", "pos": { "x": 20, "y": 10 }, "floor": 2, "kind": "waypoint" },
+    { "id": "corr_25m_2", "pos": { "x": 25, "y": 10 }, "floor": 2, "kind": "waypoint" },
+    { "id": "stair_2", "pos": { "x": 30, "y": 10 }, "floor": 2, "kind": "stair", "stairPairId": "stair_1" },
+    { "id": "entrance_2", "pos": { "x": 0, "y": 10 }, "floor": 2, "kind": "waypoint" },
+
+    { "id": "room_201", "pos": { "x": 5, "y": 16 }, "floor": 2, "kind": "room", "name": "Ward A" },
+    { "id": "room_202", "pos": { "x": 12, "y": 16 }, "floor": 2, "kind": "room", "name": "Ward B" },
+    { "id": "room_203", "pos": { "x": 19, "y": 16 }, "floor": 2, "kind": "room", "name": "Ward C" },
+    { "id": "room_204", "pos": { "x": 27, "y": 16 }, "floor": 2, "kind": "room", "name": "ICU" },
+    { "id": "room_205", "pos": { "x": 5, "y": 4 }, "floor": 2, "kind": "room", "name": "Nurses Station" },
+    { "id": "room_206", "pos": { "x": 12, "y": 4 }, "floor": 2, "kind": "room", "name": "Supplies" },
+    { "id": "room_207", "pos": { "x": 19, "y": 4 }, "floor": 2, "kind": "room", "name": "Consultation" }
+  ],
+  "edges": [
+    { "a": "entrance", "b": "corr_5m_1" },
+    { "a": "corr_5m_1", "b": "corr_10m_1" },
+    { "a": "corr_10m_1", "b": "corr_15m_1" },
+    { "a": "corr_15m_1", "b": "corr_20m_1" },
+    { "a": "corr_20m_1", "b": "corr_25m_1" },
+    { "a": "corr_25m_1", "b": "stair_1" },
+
+    { "a": "corr_5m_1", "b": "room_101" },
+    { "a": "corr_10m_1", "b": "room_102" },
+    { "a": "corr_15m_1", "b": "room_103" },
+    { "a": "corr_25m_1", "b": "room_104" },
+    { "a": "corr_5m_1", "b": "room_105" },
+    { "a": "corr_10m_1", "b": "room_106" },
+    { "a": "corr_15m_1", "b": "room_107" },
+
+    { "a": "stair_1", "b": "stair_2", "stairs": true },
+
+    { "a": "entrance_2", "b": "corr_5m_2" },
+    { "a": "corr_5m_2", "b": "corr_10m_2" },
+    { "a": "corr_10m_2", "b": "corr_15m_2" },
+    { "a": "corr_15m_2", "b": "corr_20m_2" },
+    { "a": "corr_20m_2", "b": "corr_25m_2" },
+    { "a": "corr_25m_2", "b": "stair_2" },
+
+    { "a": "corr_5m_2", "b": "room_201" },
+    { "a": "corr_10m_2", "b": "room_202" },
+    { "a": "corr_15m_2", "b": "room_203" },
+    { "a": "corr_25m_2", "b": "room_204" },
+    { "a": "corr_5m_2", "b": "room_205" },
+    { "a": "corr_10m_2", "b": "room_206" },
+    { "a": "corr_15m_2", "b": "room_207" }
+  ]
+}

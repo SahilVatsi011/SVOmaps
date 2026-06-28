@@ -4,8 +4,8 @@ import { PlanFloorMap } from '@/components/PlanFloorMap'
 import { usePDR } from '@/hooks/usePDR'
 import { useNav } from '@/store/nav'
 import {
-  type CMEdge, type CMNode, type CustomMap, type Plan,
-  loadCustomMap, pxToMeters, saveCustomMap,
+  type CMEdge, type CMNode, type CMPoint, type CustomMap, type Plan,
+  loadCustomMap, pxToMeters, saveCustomMap, buildDenseGraph,
 } from '@/lib/customMap'
 
 export const Route = createFileRoute('/plan')({
@@ -18,7 +18,7 @@ export const Route = createFileRoute('/plan')({
   component: PlanPage,
 })
 
-type Tool = 'room' | 'waypoint' | 'stair-bottom' | 'stair-top' | 'scale-a' | 'scale-b' | 'origin'
+type Tool = 'room' | 'waypoint' | 'stair-bottom' | 'stair-top' | 'scale-a' | 'scale-b' | 'origin' | 'corridor'
 
 const STORAGE_KEY_DRAFT = 'wayfinder.planDraft.v1'
 
@@ -31,6 +31,7 @@ interface Draft {
   plans: Record<number, Plan>
   nodes: CMNode[]
   edges: CMEdge[]
+  corridorTraces: Record<number, CMPoint[][]>  // per floor: array of polylines
 }
 
 function loadDraft(): Draft | null {
@@ -101,8 +102,8 @@ function PlanPage() {
     loadDraft() ?? (() => {
       const existing = loadCustomMap()
       return existing
-        ? { mapName: existing.name, plans: existing.plans ?? {}, nodes: existing.nodes, edges: existing.edges }
-        : { mapName: 'My Building', plans: {}, nodes: [], edges: [] }
+        ? { mapName: existing.name, plans: existing.plans ?? {}, nodes: existing.nodes, edges: existing.edges, corridorTraces: {} }
+        : { mapName: 'My Building', plans: {}, nodes: [], edges: [], corridorTraces: {} }
     })()
   )
   const [floor, setFloor] = useState<number>(1)
@@ -115,6 +116,7 @@ function PlanPage() {
   const [walking, setWalking] = useState(false)
   const [lastNodeId, setLastNodeId] = useState<string | null>(null)
   const [pendingStairBottomId, setPendingStairBottomId] = useState<string | null>(null)
+  const [currentTrace, setCurrentTrace] = useState<CMPoint[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -211,6 +213,11 @@ function PlanPage() {
       return
     }
     const meters = pxToMeters(plan, px, py)
+    if (tool === 'corridor') {
+      setCurrentTrace((prev) => [...prev, meters])
+      setMessage(`Corridor point ${currentTrace.length + 1} added. Click "Finish trace" when done.`)
+      return
+    }
     if (tool === 'room') {
       const name = pendingName.trim() || prompt('Room name?', 'Room ' + (draft.nodes.filter((n) => n.kind === 'room').length + 1)) || ''
       if (!name) return
@@ -266,16 +273,17 @@ function PlanPage() {
   }
 
   function save() {
+    const dense = buildDenseGraph(draft.nodes, draft.edges, draft.corridorTraces)
     const map: CustomMap = {
       name: draft.mapName || 'My Building',
       createdAt: Date.now(),
-      nodes: draft.nodes,
-      edges: draft.edges,
+      nodes: dense.nodes,
+      edges: dense.edges,
       plans: draft.plans,
     }
     try {
       saveCustomMap(map)
-      setMessage('Saved ✓ Go to "My map" to navigate.')
+      setMessage(`Saved ✓ ${dense.nodes.length} nodes · ${dense.edges.length} edges (${draft.nodes.length} manual + ${dense.nodes.length - draft.nodes.length} auto)`)
     } catch (err) {
       setMessage(`Save failed (storage too large?): ${(err as Error).message}`)
     }
@@ -337,12 +345,49 @@ function PlanPage() {
               <ToolBtn active={tool === 'waypoint'} onClick={() => setTool('waypoint')}>• Waypoint</ToolBtn>
               <ToolBtn active={tool === 'stair-bottom'} onClick={() => setTool('stair-bottom')}>↕ Stair btm</ToolBtn>
               <ToolBtn active={tool === 'stair-top'} onClick={() => setTool('stair-top')}>↕ Stair top</ToolBtn>
+              <ToolBtn active={tool === 'corridor'} onClick={() => { setTool('corridor'); setCurrentTrace([]) }}>🧵 Trace corridor</ToolBtn>
             </div>
 
             {(tool === 'room') && (
               <input value={pendingName} onChange={(e) => setPendingName(e.target.value)}
                 placeholder="Optional: pre-fill next room name"
                 className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+            )}
+
+            {tool === 'corridor' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  {currentTrace.length === 0
+                    ? 'Click on the map to trace corridor centerline'
+                    : `${currentTrace.length} points traced`}
+                </span>
+                {currentTrace.length >= 2 && (
+                  <button onClick={() => {
+                    setDraft((d) => ({
+                      ...d,
+                      corridorTraces: {
+                        ...d.corridorTraces,
+                        [floor]: [...(d.corridorTraces[floor] || []), [...currentTrace]],
+                      },
+                    }))
+                    setCurrentTrace([])
+                    setMessage(`Corridor ${(draft.corridorTraces[floor]?.length ?? 0) + 1} saved ✓`)
+                  }}
+                    className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    Finish trace
+                  </button>
+                )}
+                {currentTrace.length > 0 && (
+                  <button onClick={() => setCurrentTrace((p) => p.slice(0, -1))}
+                    className="rounded-md border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent">
+                    Undo point
+                  </button>
+                )}
+                <button onClick={() => setCurrentTrace([])}
+                  className="rounded-md border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent">
+                  Clear
+                </button>
+              </div>
             )}
 
             {(tool === 'scale-a' || tool === 'scale-b') && (

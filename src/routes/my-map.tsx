@@ -9,7 +9,7 @@ import { CustomARArrow } from '@/components/CustomARArrow'
 import {
   type CustomMap, type CMNode, bearingDegCM, calibrationForNode, decodeNodeQR,
   distCM, findPathCM, floorsInMap, loadCustomMap, nearestNodeIdCM, clearCustomMap,
-  snapToNearestEdgeCM,
+  snapToNearestEdgeCM, nearestEdgeDirection,
 } from '@/lib/customMap'
 
 export const Route = createFileRoute('/my-map')({
@@ -33,6 +33,7 @@ function MyMapPage() {
   const calibrate = useNav((s) => s.calibrate)
   const setFloor = useNav((s) => s.setFloor)
   const setSnapFn = useNav((s) => s.setSnapFn)
+  const setHeadingCorrectionFn = useNav((s) => s.setHeadingCorrectionFn)
 
   const [map, setMap] = useState<CustomMap | null>(null)
   const [destId, setDestId] = useState<string | null>(null)
@@ -71,9 +72,10 @@ function MyMapPage() {
   useEffect(() => {
     if (map) {
       setSnapFn((p) => snapToNearestEdgeCM(map, p, floor) ?? p)
-      return () => setSnapFn(null)
+      setHeadingCorrectionFn((p, h) => nearestEdgeDirection(map, p, floor) ?? h)
+      return () => { setSnapFn(null); setHeadingCorrectionFn(null) }
     }
-  }, [map, floor, setSnapFn])
+  }, [map, floor, setSnapFn, setHeadingCorrectionFn])
 
   const rooms = useMemo(() => (map?.nodes ?? []).filter((n) => n.kind === 'room'), [map])
   const floors = useMemo(() => map ? floorsInMap(map) : [], [map])
