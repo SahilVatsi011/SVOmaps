@@ -20,7 +20,7 @@ export const Route = createFileRoute('/my-map')({
 })
 
 function MyMapPage() {
-  const { status, rawHeading, stairMode, requestPermission } = usePDR()
+  const { status, stepCount, rawHeading, stairMode, requestPermission } = usePDR()
   const pos = useNav((s) => s.pos)
   const floor = useNav((s) => s.floor)
   const heading = useNav((s) => s.heading)
@@ -39,6 +39,7 @@ function MyMapPage() {
   useEffect(() => { setMap(loadCustomMap()) }, [])
   useEffect(() => { setSurveyMode(true); return () => setSurveyMode(false) }, [setSurveyMode])
   useEffect(() => { if (pos && floor !== previewFloor) setPreviewFloor(floor) }, [floor]) // eslint-disable-line
+  useEffect(() => { if (status === 'idle') { requestPermission().catch(() => {}) } }, [status, requestPermission])
 
   const rooms = useMemo(() => (map?.nodes ?? []).filter((n) => n.kind === 'room'), [map])
   const floors = useMemo(() => map ? floorsInMap(map) : [], [map])
@@ -132,8 +133,13 @@ function MyMapPage() {
               <Stat label="Floor" value={`F${floor}`} />
               <Stat label="Position" value={`${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}`} />
               <Stat label="Heading" value={`${heading.toFixed(0)}°`} />
-              <Stat label="Goal" value={path?.dest.name ?? '—'} />
+              <Stat label="Steps" value={`${stepCount}`} />
             </div>
+            {status !== 'granted' && (
+              <div className="mt-2 rounded-md bg-accent px-2 py-1 text-center text-[11px] font-medium text-accent-foreground">
+                Motion sensors not active. {status === 'denied' ? 'Please allow motion access in browser settings.' : 'Tap to enable sensors.'}
+              </div>
+            )}
             {onStairs && (
               <div className="mt-2 rounded-md bg-accent px-2 py-1 text-center text-[11px] font-medium text-accent-foreground">
                 Climbing stairs… {stairStepCount}/12
