@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePDR } from '@/hooks/usePDR'
 import { useNav } from '@/store/nav'
 import { CustomFloorMap } from '@/components/CustomFloorMap'
 import { PlanFloorMap } from '@/components/PlanFloorMap'
+import { QRScanner } from '@/components/QRScanner'
+import { CustomARArrow } from '@/components/CustomARArrow'
 import {
-  type CustomMap, type CMNode, bearingDegCM, distCM, findPathCM, floorsInMap,
-  loadCustomMap, nearestNodeIdCM, clearCustomMap,
+  type CustomMap, type CMNode, bearingDegCM, calibrationForNode, decodeNodeQR,
+  distCM, findPathCM, floorsInMap, loadCustomMap, nearestNodeIdCM, clearCustomMap,
 } from '@/lib/customMap'
 
 export const Route = createFileRoute('/my-map')({
@@ -35,6 +37,28 @@ function MyMapPage() {
   const [startId, setStartId] = useState<string | null>(null)
   const [facingId, setFacingId] = useState<string | null>(null)
   const [previewFloor, setPreviewFloor] = useState<number>(1)
+  const [showCamera, setShowCamera] = useState(false)
+  const [showCalibScanner, setShowCalibScanner] = useState(false)
+  const [showRescan, setShowRescan] = useState(false)
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null)
+  const [miniMapExpanded, setMiniMapExpanded] = useState(false)
+  const lastScanAt = useRef(0)
+
+  const handleQRDecode = useCallback((text: string) => {
+    const now = performance.now()
+    if (now - lastScanAt.current < 1500) return
+    const cmId = decodeNodeQR(text)
+    if (!cmId) return
+    const m = map
+    if (!m) return
+    const cal = calibrationForNode(m, cmId)
+    if (!cal) return
+    lastScanAt.current = now
+    calibrate(rawHeading, { pos: cal.pos, floor: cal.floor as 1 | 2, headingDeg: cal.headingDeg })
+    const node = m.nodes.find((n) => n.id === cmId)
+    setScanFeedback(`Locked at ${node?.name ?? cmId}`)
+    setTimeout(() => setScanFeedback(null), 2000)
+  }, [map, calibrate, rawHeading])
 
   useEffect(() => { setMap(loadCustomMap()) }, [])
   useEffect(() => { setSurveyMode(true); return () => setSurveyMode(false) }, [setSurveyMode])
@@ -124,9 +148,134 @@ function MyMapPage() {
               Calibrate & start
             </button>
             {status === 'denied' && <p className="mt-2 text-xs text-destructive">Motion permission denied.</p>}
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-center text-xs text-muted-foreground mb-3">— or scan a QR sticker —</p>
+              {!showCalibScanner ? (
+                <button onClick={() => setShowCalibScanner(true)}
+                  className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                  📷 Scan QR sticker
+                </button>
+              ) : (
+                <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
+                  <QRScanner active={showCalibScanner} onDecode={handleQRDecode} className="size-full" />
+                  <button onClick={() => setShowCalibScanner(false)}
+                    className="absolute top-2 right-2 rounded-full bg-background/80 px-2 py-1 text-xs text-foreground backdrop-blur">
+                    ✕ Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </section>
-      ) : (
+      ) : showCamera ? (
+        <div className="relative flex flex-1 flex-col bg-black">
+          <div className="absolute inset-0">
+            <QRScanner active={showCamera} onDecode={handleQRDecode} className="size-full" />
+            {pos && path && (
+              <CustomARArrow pos={pos} heading={heading} floor={floor}
+                path={path} stairStepCount={stairStepCount} onStairs={onStairs} />
+            )}
+            {scanFeedback && (
+              <div className="absolute inset-x-0 top-2 mx-auto w-max rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                {scanFeedback}
+              </div>
+            )}
+          </div>
+
+          <div className="absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/60 to-transparent p-3">
+            <div className="flex items-center gap-3 text-[11px] text-white/90">
+              <span className="font-semibold">F{floor}</span>
+              <span>{pos.x.toFixed(1)},{pos.y.toFixed(1)}</span>
+              <span>{heading.toFixed(0)}°</span>
+              <span>{stepCount}s</span>
+              {stairMode && <span>↕</span>}
+            </div>
+            {status !== 'granted' && (
+              <div className="mt-1 rounded bg-accent/80 px-2 py-0.5 text-[10px] text-accent-foreground">
+                Motion sensors not active
+              </div>
+            )}
+          </div>
+
+          <div className="absolute inset-x-0 top-14 z-10 flex justify-center">
+            <select value={destId ?? ''} onChange={(e) => setDestId(e.target.value || null)}
+              className="w-4/5 rounded-lg border border-white/30 bg-black/60 px-3 py-1.5 text-[11px] text-white backdrop-blur">
+              <option value="" className="text-black">— destination —</option>
+              {rooms.map((r) => <option key={r.id} value={r.id} className="text-black">F{r.floor} · {r.name}</option>)}
+            </select>
+          </div>
+
+          {onStairs && (
+            <div className="absolute inset-x-0 top-24 z-10 flex justify-center">
+              <div className="rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-accent-foreground shadow">
+                Climbing stairs… {stairStepCount}/12
+              </div>
+            </div>
+          )}
+
+          <div
+            onClick={() => setMiniMapExpanded(true)}
+            className="absolute bottom-16 right-3 z-20 w-24 h-32 overflow-hidden rounded-lg border-2 border-white/40 shadow-xl bg-card cursor-pointer hover:scale-105 transition-transform"
+          >
+            {map.plans?.[previewFloor] ? (
+              <PlanFloorMap map={map} plan={map.plans[previewFloor]} floor={previewFloor}
+                pathIds={pathIds} highlightNodeId={destId} className="size-full" />
+            ) : (
+              <CustomFloorMap map={map} floor={previewFloor} pathIds={pathIds} highlightNodeId={destId} className="size-full" />
+            )}
+            <div className="absolute inset-x-0 bottom-0 bg-black/60 text-[8px] text-white/80 text-center py-0.5">tap to expand</div>
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/60 to-transparent p-3">
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center gap-1 rounded-md bg-white/20 px-2 py-1 text-[10px] text-white/90">
+                {floors.map((f) => (
+                  <button key={f} onClick={() => { setPreviewFloor(f); setFloor(f as 1 | 2) }}
+                    className={`rounded px-2 py-0.5 font-semibold ${previewFloor === f ? 'bg-white/30 text-white' : 'text-white/60'}`}>
+                    F{f}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setShowCamera(false)}
+                className="rounded-lg bg-white/20 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur">
+                🗺 2D Map
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className={`fixed inset-0 z-50 flex flex-col bg-background transition-all duration-300 ease-in-out ${
+          miniMapExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <button onClick={() => setMiniMapExpanded(false)}
+            className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">
+            ← Back to AR
+          </button>
+          <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5 text-[11px]">
+            {floors.map((f) => (
+              <button key={f} onClick={() => { setPreviewFloor(f); setFloor(f as 1 | 2) }}
+                className={`rounded px-2 py-0.5 font-semibold ${previewFloor === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                F{f}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 p-2">
+          {map.plans?.[previewFloor] ? (
+            <PlanFloorMap map={map} plan={map.plans[previewFloor]} floor={previewFloor}
+              pathIds={pathIds} highlightNodeId={destId} className="size-full" />
+          ) : (
+            <CustomFloorMap map={map} floor={previewFloor} pathIds={pathIds} highlightNodeId={destId} className="size-full" />
+          )}
+        </div>
+      </div>
+
+      {pos && !showCamera && (
         <>
           <section className="border-b border-border bg-muted/40 px-4 py-3">
             <div className="grid grid-cols-4 gap-2 text-xs">
@@ -215,27 +364,79 @@ function MyMapPage() {
               )}
             </div>
           </section>
+
+          <section className="px-4 pb-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowCamera(true)}
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent">
+                📷 AR Camera navigation
+              </button>
+              <button onClick={() => setShowRescan((c) => !c)}
+                className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent">
+                📷 Re-scan sticker
+              </button>
+            </div>
+            {showRescan && (
+              <div className="relative mt-2 aspect-video rounded-xl overflow-hidden bg-black">
+                <QRScanner active={showRescan} onDecode={handleQRDecode} className="size-full" />
+                <button onClick={() => setShowRescan(false)}
+                  className="absolute top-2 right-2 rounded-full bg-background/80 px-2 py-1 text-xs text-foreground backdrop-blur">
+                  ✕ Cancel
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="mt-auto grid grid-cols-2 gap-2 p-4">
+            <Link to="/my-anchors"
+              className="col-span-2 rounded-xl bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+              🖨 Print QR stickers for my map
+            </Link>
+            <Link to="/survey"
+              className="rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground hover:bg-accent">
+              Edit / re-survey
+            </Link>
+            <button onClick={() => { if (confirm('Delete saved map?')) { clearCustomMap(); setMap(null) } }}
+              className="col-span-2 rounded-xl border border-destructive/40 bg-card px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10">
+              Delete map
+            </button>
+          </section>
         </>
       )}
 
-      <section className="mt-auto grid grid-cols-2 gap-2 p-4">
-        <Link to="/my-anchors"
-          className="col-span-2 rounded-xl bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-          🖨 Print QR stickers for my map
-        </Link>
-        <Link to="/scan"
-          className="rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground hover:bg-accent">
-          Scan a sticker
-        </Link>
-        <Link to="/survey"
-          className="rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground hover:bg-accent">
-          Edit / re-survey
-        </Link>
-        <button onClick={() => { if (confirm('Delete saved map?')) { clearCustomMap(); setMap(null) } }}
-          className="col-span-2 rounded-xl border border-destructive/40 bg-card px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10">
-          Delete map
-        </button>
-      </section>
+      {!pos && (
+        <section className="mt-auto grid grid-cols-2 gap-2 p-4">
+          <Link to="/my-anchors"
+            className="col-span-2 rounded-xl bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            🖨 Print QR stickers for my map
+          </Link>
+          <Link to="/survey"
+            className="rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground hover:bg-accent">
+            Edit / re-survey
+          </Link>
+          <button onClick={() => { if (confirm('Delete saved map?')) { clearCustomMap(); setMap(null) } }}
+            className="col-span-2 rounded-xl border border-destructive/40 bg-card px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10">
+            Delete map
+          </button>
+        </section>
+      )}
+
+      {pos && showCamera && !miniMapExpanded && (
+        <section className="mt-auto grid grid-cols-2 gap-2 p-4">
+          <Link to="/my-anchors"
+            className="col-span-2 rounded-xl bg-primary px-3 py-3 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            🖨 Print QR stickers for my map
+          </Link>
+          <Link to="/survey"
+            className="rounded-xl border border-border bg-card px-3 py-3 text-center text-sm font-medium text-foreground hover:bg-accent">
+            Edit / re-survey
+          </Link>
+          <button onClick={() => { if (confirm('Delete saved map?')) { clearCustomMap(); setMap(null) } }}
+            className="col-span-2 rounded-xl border border-destructive/40 bg-card px-3 py-3 text-sm font-medium text-destructive hover:bg-destructive/10">
+            Delete map
+          </button>
+        </section>
+      )}
     </div>
   )
 }
