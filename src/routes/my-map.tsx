@@ -449,11 +449,11 @@ function MyMapPage() {
           </button>
         </section>
       )}
-    </div>
-  )
-}
+          </div>
+    )
+  }
 
-function Header({ name }: { name?: string } = {}) {
+  function Header({ name }: { name?: string } = {}) {
   return (
     <header className="flex items-center justify-between border-b border-border px-4 pb-3 pt-5">
       <div>
